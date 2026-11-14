@@ -12,10 +12,10 @@ jobs:
     name: Project check (build + tests)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22 }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: { python-version: '3.12' }
       - name: scripts/check, or build + test
         run: |
@@ -27,7 +27,7 @@ jobs:
     name: Secrets (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { fetch-depth: 0 }   # the whole history: a key deleted later is still leaked
       - name: gitleaks 8.21.2
         run: |
@@ -38,7 +38,7 @@ jobs:
     name: Weak libraries (osv-scanner)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: osv-scanner 1.9.1
         run: |
           curl -sSL -o osv https://github.com/google/osv-scanner/releases/download/v1.9.1/osv-scanner_linux_amd64 && chmod +x osv
@@ -50,10 +50,6 @@ jobs:
     name: Code holes (Semgrep, OWASP Top 10)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.12' }
-      - name: semgrep 1.95.0
-        run: |
-          pip install -q semgrep==1.95.0
-          semgrep scan --config p/owasp-top-ten --severity ERROR --error --metrics off .
+      - uses: actions/checkout@v5
+      - name: semgrep 1.95.0 (official image, pinned)
+        run: docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep:1.95.0 semgrep scan --config p/owasp-top-ten --severity ERROR --error --metrics off .
