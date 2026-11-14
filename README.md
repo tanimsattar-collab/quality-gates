@@ -22,10 +22,15 @@ on:
   pull_request:
 jobs:
   gates:
-    uses: tanimsattar-collab/quality-gates/.github/workflows/gates.yml@main
+    uses: tanimsattar-collab/quality-gates/.github/workflows/gates.yml@v1
 ```
 
 2. Add `scripts/check`: one command that builds and tests the project. It must exit with an error when something is wrong.
 3. Add `.github/dependabot.yml` so library updates arrive as pull requests.
 
 The same `scripts/check` runs on your Mac before every `git push` (the global Claude hook), so a red check never leaves the laptop.
+
+## Versions
+
+Projects use `@v1`, a fixed version. A change here reaches no project until the `v1` tag is moved on purpose:
+`git tag -f v1 && git push -f origin v1` (or make `v2` for a breaking change).
