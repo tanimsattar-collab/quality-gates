@@ -1,0 +1,59 @@
+# Shared quality gates. Every project calls this file from its own .github/workflows/quality.yml.
+# Four jobs, all must be green: the project's own check, secrets, weak libraries, code holes.
+name: gates
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Project check (build + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: scripts/check, or build + test
+        run: |
+          if [ -f scripts/check ]; then bash scripts/check
+          elif [ -f package.json ]; then npm ci && npm run build --if-present && npm test --if-present
+          else echo "No scripts/check and no package.json: nothing to build or test"; fi
+
+  secrets:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # the whole history: a key deleted later is still leaked
+      - name: gitleaks 8.21.2
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks git --redact --no-banner -v .
+
+  libraries:
+    name: Weak libraries (osv-scanner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: osv-scanner 1.9.1
+        run: |
+          curl -sSL -o osv https://github.com/google/osv-scanner/releases/download/v1.9.1/osv-scanner_linux_amd64 && chmod +x osv
+          set +e; ./osv --recursive .; code=$?; set -e
+          if [ $code -eq 128 ]; then echo "No package files to scan"; exit 0; fi   # 128 = nothing to scan
+          exit $code
+
+  code:
+    name: Code holes (Semgrep, OWASP Top 10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: semgrep 1.95.0
+        run: |
+          pip install -q semgrep==1.95.0
+          semgrep scan --config p/owasp-top-ten --severity ERROR --error --metrics off .
