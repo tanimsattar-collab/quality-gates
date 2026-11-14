@@ -49,9 +49,22 @@ jobs:
       - name: osv-scanner 1.9.1
         run: |
           curl -sSL -o osv https://github.com/google/osv-scanner/releases/download/v1.9.1/osv-scanner_linux_amd64 && chmod +x osv
-          set +e; ./osv --recursive .; code=$?; set -e
+          set +e; ./osv --recursive --format json . > osv.json; code=$?; set -e
           if [ $code -eq 128 ]; then echo "No package files to scan"; exit 0; fi   # 128 = nothing to scan
-          exit $code
+          # Fail on holes in code that ships to users; holes in dev-only tools (tests, build) are warnings.
+          python3 - <<'PY'
+          import json, sys
+          bad = warn = 0
+          for r in json.load(open('osv.json')).get('results', []):
+              for p in r['packages']:
+                  dev = 'dev' in p.get('dependency_groups', [])
+                  top = max((float(g.get('max_severity') or 0) for g in p['groups']), default=0)
+                  line = f"{p['package']['name']}@{p['package']['version']} ({r['source']['path']}) worst {top}"
+                  print(('WARN dev-only ' if dev else 'FAIL ') + line)
+                  warn += dev; bad += not dev
+          print(f'{bad} shipped package(s) with known holes, {warn} dev-only')
+          sys.exit(1 if bad else 0)
+          PY
 
   code:
     name: Code holes (Semgrep, OWASP Top 10)
