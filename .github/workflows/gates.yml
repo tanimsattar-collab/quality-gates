@@ -17,10 +17,17 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-python@v6
         with: { python-version: '3.12' }
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; fi
+          if [ -f requirements.txt ]; then pip install -q -r requirements.txt; fi
+          for r in */requirements.txt; do [ -f "$r" ] && pip install -q -r "$r"; done; true
       - name: scripts/check, or build + test
+        env:
+          CI: 'true'
         run: |
           if [ -f scripts/check ]; then bash scripts/check
-          elif [ -f package.json ]; then npm ci && npm run build --if-present && npm test --if-present
+          elif [ -f package.json ]; then npm run build --if-present && npm test --if-present
           else echo "No scripts/check and no package.json: nothing to build or test"; fi
 
   secrets:
